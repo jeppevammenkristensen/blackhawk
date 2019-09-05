@@ -7,11 +7,13 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.2.1" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
+    <PackageReference Include="NJsonSchema.CodeGeneration.CSharp" Version="10.0.23" />
     <PackageReference Include="Pluralize.NET" Version="1.0.2" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="LanguageConverters\" />
+    <Folder Include="LanguageConverters\Json\CodeWriters\" />
   </ItemGroup>
 
 </Project>

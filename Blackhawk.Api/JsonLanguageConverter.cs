@@ -1,11 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using Blackhawk.LanguageConverters.Json;
+using System.Linq;
+using System.Threading;
 using Blackhawk.Models.LanguageConverter;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
+using NJsonSchema;
+using NJsonSchema.CodeGeneration.CSharp;
+using Conversion = Blackhawk.Models.LanguageConverter.Conversion;
 
 namespace Blackhawk
 {
@@ -15,7 +22,7 @@ namespace Blackhawk
 
         public JsonConvertionSettings WithPascalCase(bool usePascalCase)
         {
-            this.UsePascalCase = usePascalCase;
+            UsePascalCase = usePascalCase;
             return this;
         }
     }
@@ -44,19 +51,20 @@ namespace Blackhawk
 
         public Conversion GenerateCsharp(string input)
         {
-            var jsonClassHelper = new JsonClassGenerator();
-            var writer = new StringWriter();
+            var csharpSettings = new CSharpGeneratorSettings();
+            csharpSettings.ClassStyle = CSharpClassStyle.Poco;
+            csharpSettings.TypeNameGenerator = new CustomDefaultTypeName(PrimaryClass);
+            csharpSettings.GenerateJsonMethods = true;
 
-            jsonClassHelper.Example = input;
-            jsonClassHelper.MainClass = PrimaryClass;
-            jsonClassHelper.OutputStream = writer;
-            jsonClassHelper.UseProperties = true;
-            jsonClassHelper.UsePascalCase = _settings.UsePascalCase;
+            var schema = JsonSchema.FromSampleJson(input);
 
-            jsonClassHelper.GenerateClasses();
+            var cSharpGenerator = new CSharpGenerator(schema,csharpSettings);
+            var result = cSharpGenerator.GenerateFile();
+            var classDeclarationSyntaxs = SyntaxFactory.ParseCompilationUnit(result).DescendantNodes().OfType<ClassDeclarationSyntax>().ToArray();
 
-            return new Conversion(writer.ToString(), PrimaryClass, true);
+            var resultString = SyntaxFactory.CompilationUnit().AddMembers(classDeclarationSyntaxs).NormalizeWhitespace().ToString();
 
+            return new Conversion(PrimaryClass,resultString, false);
         }
 
         public string PrimaryClass => "ReturnObject";
@@ -80,4 +88,25 @@ namespace Blackhawk
                 });
         }
     }
+
+    public class CustomDefaultTypeName : DefaultTypeNameGenerator
+    {
+        private readonly string _defaultName;
+
+        public CustomDefaultTypeName(string defaultName)
+        {
+            _defaultName = defaultName;
+        }
+
+        public override string Generate(JsonSchema schema, string typeNameHint, IEnumerable<string> reservedTypeNames)
+        {
+            if (string.IsNullOrWhiteSpace(typeNameHint))
+            {
+                return _defaultName;
+            }
+            return base.Generate(schema, typeNameHint, reservedTypeNames);
+        }
+    }
+
+
 }
