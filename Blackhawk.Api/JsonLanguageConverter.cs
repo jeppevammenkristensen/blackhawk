@@ -60,14 +60,14 @@ namespace Blackhawk
 
             var cSharpGenerator = new CSharpGenerator(schema,csharpSettings);
             var result = cSharpGenerator.GenerateFile();
-            var classDeclarationSyntaxs = SyntaxFactory.ParseCompilationUnit(result).DescendantNodes().OfType<ClassDeclarationSyntax>().ToArray();
+            var classDeclarationSyntaxs = SyntaxFactory.ParseCompilationUnit(result).DescendantNodes().OfType<ClassDeclarationSyntax>().Cast<MemberDeclarationSyntax>().ToArray();
 
-            var resultString = SyntaxFactory.CompilationUnit().AddMembers(classDeclarationSyntaxs).NormalizeWhitespace().ToString();
+            string resultString = SyntaxFactory.CompilationUnit().AddMembers(classDeclarationSyntaxs).NormalizeWhitespace().ToString();
 
             return new Conversion(PrimaryClass,resultString, false);
         }
 
-        public string PrimaryClass => "ReturnObject";
+        public string PrimaryClass { get; set; } = "ReturnObject";
 
         public object Deserialize(Type parameterType, string requestSource)
         {
