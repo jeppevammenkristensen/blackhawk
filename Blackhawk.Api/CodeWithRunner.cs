@@ -1,12 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Xml.Serialization;
 using Blackhawk.Models.LanguageConverter;
 using Blackhawk.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Formatting;
+using Newtonsoft.Json;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Blackhawk
@@ -16,7 +23,7 @@ namespace Blackhawk
         public static SourceBuilder Init()
         {
             return new SourceBuilder();
-        } 
+        }
     }
 
     public enum SourceStatus
@@ -30,7 +37,7 @@ namespace Blackhawk
         public readonly Assembly _assembly;
         public readonly string[] _usings;
 
-        public Reference(Assembly assembly,params string[] usings)
+        public Reference(Assembly assembly, params string[] usings)
         {
             _assembly = assembly;
             _usings = usings;
@@ -42,8 +49,8 @@ namespace Blackhawk
         public List<ClassDeclarationSyntax> ClassSources { get; set; }
         public ClassDeclarationSyntax PrimarySource { get; set; }
 
-        public List<Reference> References { get; } = new List<Reference>(); 
-        
+        public List<Reference> References { get; } = new List<Reference>();
+
         internal Source()
         {
             //MetadataReference.CreateFromFile(typeof(string).GetTypeInfo().Assembly.Location),
@@ -54,9 +61,14 @@ namespace Blackhawk
             //MetadataReference.CreateFromFile(typeof(Regex).GetTypeInfo().Assembly.Location), 
             //MetadataReference.CreateFromFile(typeof(StringReader).GetTypeInfo().Assembly.Location),
             //MetadataReference.CreateFromFile(typeof(CultureInfo).GetTypeInfo().Assembly.Location),
-            References.Add(new Reference(typeof(string).GetTypeInfo().Assembly, "System"));
+            References.Add(new Reference(typeof(JsonArrayAttribute).GetTypeInfo()
+                .Assembly, "Newtonsoft.Json"));
+
+            References.Add(new Reference(typeof(string).GetTypeInfo().Assembly, "System","System.Threading.Tasks"));
             References.Add(new Reference(typeof(IEnumerable<>).GetTypeInfo().Assembly, "System.Collections.Generic"));
-            References.Add(new Reference(typeof(Enumerable).GetTypeInfo().Assembly,"System.Data.Linq"));
+            References.Add(new Reference(typeof(Enumerable).GetTypeInfo().Assembly, "System.Linq"));
+            References.Add(new Reference(typeof(System.CodeDom.Compiler.GeneratedCodeAttribute).GetTypeInfo()
+                .Assembly));
         }
 
         public string InputParameterName { get; private set; } = "input";
@@ -67,35 +79,65 @@ namespace Blackhawk
             return this;
         }
 
-        public CompilationUnitSyntax BuildCompilation
+       
+        public CompilationUnitSyntax BuildCompilation(string source)
         {
-            get
-            {
-                var compilationUnitSyntax = CompilationUnit().AddUsings(References.SelectMany(x => x._usings)
-                    .Select(x => UsingDirective(ParseName(x))).ToArray());
+            var blockSyntax = (BlockSyntax)ParseStatement($"{{ {source} }}");
 
-                compilationUnitSyntax = compilationUnitSyntax.AddMembers(
-                    ClassDeclaration("Runner")
-                        .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
-                        .AddMembers(ClassSources.ToArray())
-                        .AddMembers(
-                            MethodDeclaration(PredefinedType(Token(SyntaxKind.ObjectKeyword)), "RunAsync")
-                                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword),
-                                    Token(SyntaxKind.AsyncKeyword))
-                                .AddParameterListParameters(Parameter(Identifier(InputParameterName))
-                                    .WithType(IdentifierName(PrimarySource.Identifier))))).NormalizeWhitespace();
+            var customWorkSpace = new AdhocWorkspace();
+            var compilationUnitSyntax = CompilationUnit().AddUsings().NormalizeWhitespace();
 
-                return compilationUnitSyntax;
+            var usingStatements = References.SelectMany(x => x._usings)
+                .Select(x => UsingDirective(ParseName(x))).ToArray();
 
-            }
-        } 
+            var runnerMethod =
+                MethodDeclaration(
+                        // returnType: Task<Object> // MethodName RunAsync  
+                        returnType: GenericName(Identifier("Task"))
+                            .AddTypeArgumentListArguments(PredefinedType(Token(SyntaxKind.ObjectKeyword))), "RunAsync"
+                    )
+                    // public static async
+                    .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword),
+                        Token(SyntaxKind.AsyncKeyword))
+                    // Input parameter for instance ReturnObject input
+                    .AddParameterListParameters(Parameter(Identifier(InputParameterName))
+                        .WithType(IdentifierName(PrimarySource.Identifier)))
+                    .AddBodyStatements(blockSyntax);
 
-        
+            var classDeclaration = ClassDeclaration("Runner")
+                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
+                .AddMembers(runnerMethod);
+
+
+            compilationUnitSyntax = CompilationUnit()
+                .AddUsings(usingStatements)
+                .AddMembers(classDeclaration)
+                .AddMembers(ClassSources.ToArray()).NormalizeWhitespace();
+
+
+            return (CompilationUnitSyntax)Formatter.Format(compilationUnitSyntax, customWorkSpace);
+        }
+
+        public CompiledCode Compile(CompilationUnitSyntax syntax)
+        {
+            CSharpCompilationOptions options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Debug);
+
+            var compilation = CSharpCompilation.Create("InMemory")
+                .WithReferences(References.Select(x => MetadataReference.CreateFromFile(x._assembly.Location)))
+                .WithOptions(options)
+                .AddSyntaxTrees(syntax.SyntaxTree);
+            return CompiledCode.Compile(compilation);
+        }
 
         public static Source Invalid(string details)
         {
             return null;
         }
+
+        //public Task<object> ExecuteAsync(string returnInput)
+        //{
+        //    var buildCompilation = BuildCompilation(returnInput);
+        //}
     }
 
     public class SourceBuilder
@@ -147,7 +189,8 @@ namespace Blackhawk
         }
     }
 
-    
+
+
 
     public class FindClassesVisitor : CSharpSyntaxWalker
     {
