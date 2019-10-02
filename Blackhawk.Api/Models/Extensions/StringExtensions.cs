@@ -5,6 +5,7 @@ using System.Text;
 
 namespace Blackhawk.Models.Extensions
 {
+
     public static class StringExtensions
     {
         public static string FirstToUpper(this string source)

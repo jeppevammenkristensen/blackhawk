@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using Blackhawk.Extensions;
 using FluentAssertions;
 using Namotion.Reflection;
 using Xunit;
@@ -24,15 +25,20 @@ namespace Blackhawk
             var builder = Build.Init().WithConverter(new JsonLanguageConverter(new JsonConvertionSettings()));
             var source = builder.GenerateSource("[{ \"name\" : { \"firstName\" : \"Jeppe Kristensen\"}}]");
             source.PrimarySource.Identifier.ToString().Should().Be("ReturnObject");
-            
+
             var nameClass = source.ClassSources.FirstOrDefault(x => x.Name == "Name");
-            
-            //var result = source.ExecuteAsync("return input;");
-            var result = source.BuildBaseCompilation();
-            var item = source.Compile(result);
+
+            var (obj, code) = await source.Repl().Execute("return input;");
+            obj.Should().NotBeNull();
+            obj.Should().Be(5);
+            // //var result = source.ExecuteAsync("return input;");
+            // var result = source.BuildBaseCompilation();
+            // var item = source.Compile(result);
+            //tem.Success.Should().BeTrue();
+
 
             //item.Diagnostics.Should().HaveCount(1);
-            item.Success.Should().BeTrue();
+
 
             //var mainType = item.Assembly.GetType("Runner");
             //var methodInfo = mainType.GetMethod("RunAsync");
@@ -50,3 +56,4 @@ namespace Blackhawk
 
     }
 }
+    

@@ -1,14 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Xml.Serialization;
-using Blackhawk.Models.LanguageConverter;
-using Blackhawk.Parsing;
+using Blackhawk;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -46,29 +42,24 @@ namespace Blackhawk
 
     public class Source
     {
-        public List<ClassDeclarationSyntax> ClassSources { get; set; }
-        public ClassDeclarationSyntax PrimarySource { get; set; }
+        public ReadOnlyCollection<ClassFile> ClassSources { get; internal set; }
+        public ClassDeclarationSyntax PrimarySource { get; internal set; }
 
         public List<Reference> References { get; } = new List<Reference>();
 
         internal Source()
         {
-            //MetadataReference.CreateFromFile(typeof(string).GetTypeInfo().Assembly.Location),
-            //MetadataReference.CreateFromFile(typeof(JsonPropertyAttribute).GetTypeInfo().Assembly.Location),
-            //MetadataReference.CreateFromFile(typeof(IEnumerable<>).GetTypeInfo().Assembly.Location),
-            //MetadataReference.CreateFromFile(typeof(Enumerable).GetTypeInfo().Assembly.Location),
-            //MetadataReference.CreateFromFile(typeof(XmlRootAttribute).GetTypeInfo().Assembly.Location), 
-            //MetadataReference.CreateFromFile(typeof(Regex).GetTypeInfo().Assembly.Location), 
-            //MetadataReference.CreateFromFile(typeof(StringReader).GetTypeInfo().Assembly.Location),
-            //MetadataReference.CreateFromFile(typeof(CultureInfo).GetTypeInfo().Assembly.Location),
             References.Add(new Reference(typeof(JsonArrayAttribute).GetTypeInfo()
                 .Assembly, "Newtonsoft.Json"));
-
-            References.Add(new Reference(typeof(string).GetTypeInfo().Assembly, "System","System.Threading.Tasks"));
+            References.Add(new Reference(typeof(string).GetTypeInfo().Assembly, "System", "System.Threading.Tasks"));
             References.Add(new Reference(typeof(IEnumerable<>).GetTypeInfo().Assembly, "System.Collections.Generic"));
             References.Add(new Reference(typeof(Enumerable).GetTypeInfo().Assembly, "System.Linq"));
+            References.Add(new Reference(Assembly.Load("netstandard, Version=2.0.0.0")));
             References.Add(new Reference(typeof(System.CodeDom.Compiler.GeneratedCodeAttribute).GetTypeInfo()
                 .Assembly));
+            References.Add(new Reference(typeof(Attribute).GetTypeInfo()
+                .Assembly));
+            References.Add(new Reference(Assembly.Load("System.Runtime, Version=4.2.1.0")));
         }
 
         public string InputParameterName { get; private set; } = "input";
@@ -79,13 +70,34 @@ namespace Blackhawk
             return this;
         }
 
-       
+
+        public CompilationUnitSyntax BuildBaseCompilation()
+        {
+            var customWorkSpace = new AdhocWorkspace();
+
+            var compilationUnitSyntax = CompilationUnit().AddUsings().NormalizeWhitespace();
+
+            var usingStatements = References.SelectMany(x => x._usings)
+                .Select(x => UsingDirective(ParseName(x))).ToArray();
+
+            compilationUnitSyntax = CompilationUnit()
+                .AddUsings(usingStatements)
+                .AddMembers(ClassSources
+                    .Select(x => x.ClassDeclarationSyntax)
+                    .ToArray()).NormalizeWhitespace();
+
+
+            return (CompilationUnitSyntax)Formatter.Format(compilationUnitSyntax, customWorkSpace);
+
+        }
+
+
         public CompilationUnitSyntax BuildCompilation(string source)
         {
             var blockSyntax = (BlockSyntax)ParseStatement($"{{ {source} }}");
 
             var customWorkSpace = new AdhocWorkspace();
-            var compilationUnitSyntax = CompilationUnit().AddUsings().NormalizeWhitespace();
+            //var compilationUnitSyntax = CompilationUnit().AddUsings().NormalizeWhitespace();
 
             var usingStatements = References.SelectMany(x => x._usings)
                 .Select(x => UsingDirective(ParseName(x))).ToArray();
@@ -108,15 +120,17 @@ namespace Blackhawk
                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
                 .AddMembers(runnerMethod);
 
-
-            compilationUnitSyntax = CompilationUnit()
+            var compilationUnitSyntax = CompilationUnit()
                 .AddUsings(usingStatements)
                 .AddMembers(classDeclaration)
-                .AddMembers(ClassSources.ToArray()).NormalizeWhitespace();
-
+                .AddMembers(ClassSources
+                    .Select(x => x.ClassDeclarationSyntax)
+                    .Cast<MemberDeclarationSyntax>()
+                    .ToArray()).NormalizeWhitespace();
 
             return (CompilationUnitSyntax)Formatter.Format(compilationUnitSyntax, customWorkSpace);
         }
+
 
         public CompiledCode Compile(CompilationUnitSyntax syntax)
         {
@@ -140,57 +154,6 @@ namespace Blackhawk
         //}
     }
 
-    public class SourceBuilder
-    {
-        internal SourceStatus Status { get; private set; } = SourceStatus.Incomplete;
-        private ILanguageConverter _converter = null;
-
-        public SourceBuilder WithConverter(ILanguageConverter languageConverter)
-        {
-            _converter = languageConverter ?? throw new ArgumentNullException(nameof(languageConverter));
-            Status = SourceStatus.ReadyForParsing;
-            return this;
-        }
-
-        public Source GenerateCsharp(string source)
-        {
-            var (success, details) = _converter.InputIsValid(source);
-            if (success)
-            {
-                var result = _converter.GenerateCsharp(source);
-                var compilationUnit = ParseCompilationUnit(result.Classes);
-
-                var finder = new FindClassesVisitor();
-                finder.Visit(compilationUnit);
-                var classes = finder.Classes;
-
-                var primary =
-                    classes.FirstOrDefault(x => x.Identifier.ToString() == result.PrimaryClass);
-
-                if (primary == null)
-                {
-                    throw new InvalidOperationException(
-                        $"Failed to find a primary class with the name {result.PrimaryClass} in the list of generated classed");
-                }
-
-                return new Source()
-                {
-                    ClassSources = classes,
-                    PrimarySource = primary
-                };
-            }
-            else
-            {
-                return Source.Invalid(details);
-            }
-
-            //
-            //var result = _converter.GenerateCsharp(source);
-        }
-    }
-
-
-
 
     public class FindClassesVisitor : CSharpSyntaxWalker
     {
@@ -203,40 +166,94 @@ namespace Blackhawk
         }
     }
 
-    public class CSharpFile
+    public class ClassFile
     {
-        public string Name { get; set; }
-        public string Text { get; set; }
-
-        public ClassDeclarationSyntax ClassDeclarationSyntax { get; set; }
-    }
-
-    /// <summary>
-    /// The base code with the generated classes and the Runner class that is used to
-    /// run the code
-    /// </summary>
-    public class CodeWithRunner
-    {
-        public CodeWithRunner(SyntaxNode basecode)
+        internal ClassFile()
         {
-            Basecode = basecode;
-            var walker = new PropertyVisitor();
-            walker.Visit(basecode);
-            this.Properties = walker.Properties;
+
         }
 
-        public List<PropertyInformation> Properties { get; set; }
-
-        public SyntaxNode Basecode { get; set; }
-
-
-        public SyntaxNode AddCode(string code)
+        internal ClassFile(ClassDeclarationSyntax classDeclarationSyntax)
         {
-            var methodDeclaration = new StatementRewriter
+            SetValuesFromClassDeclaration(classDeclarationSyntax);
+
+        }
+
+        private void SetValuesFromClassDeclaration(ClassDeclarationSyntax classDeclarationSyntax)
+        {
+            ClassDeclarationSyntax = classDeclarationSyntax;
+            Name = classDeclarationSyntax.Identifier.ToString();
+            Text = classDeclarationSyntax.ToString();
+        }
+
+        public string Name { get; private set; }
+        public string Text { get; private set; }
+
+        public ClassDeclarationSyntax ClassDeclarationSyntax { get; set; }
+
+        public ClassFile UpdateText(string text)
+        {
+            var compilationUnit = SyntaxFactory.ParseCompilationUnit(text);
+            if (compilationUnit.Members.Count > 1 ||
+                !(compilationUnit.Members.FirstOrDefault() is ClassDeclarationSyntax))
             {
-                Statement = code
-            };
-            return methodDeclaration.Visit(this.Basecode);
+                throw new InvalidOperationException("The new value must be a single class");
+            }
+
+
+            SetValuesFromClassDeclaration((ClassDeclarationSyntax)compilationUnit.Members.First());
+
+            return this;
+        }
+
+    }
+
+    public class BlackhawkDownException : Exception
+    {
+        public string Message { get; }
+        public string Description { get; }
+
+        public BlackhawkDownException(string message, string description)
+        {
+            Message = message;
+            Description = description;
+        }
+    }
+
+    public class Repl
+    {
+        public Source Source { get; }
+
+        internal Repl(Source source)
+        {
+            Source = source;
+        }
+
+        public async Task<(object? result, CompiledCode? code)> Execute(string repl)
+        {
+            var compilationUnitSyntax = Source.BuildCompilation(repl);
+            var compiledCode = Source.Compile(compilationUnitSyntax);
+            if (compiledCode.Success)
+            {
+                var mainType = compiledCode.Assembly.GetType("Runner");
+                var methodInfo = mainType.GetMethod("RunAsync");
+                var task = (Task<object>)methodInfo.Invoke(null, new object[] { null });
+                var res = await task;
+                return (res, compiledCode);
+            }
+            else
+            {
+                return (null, compiledCode);
+            }
+        }
+    }
+
+
+    public static class Compiler
+    {
+        public static CompiledCode Compile(Source source, CompilationUnitSyntax compilationUnit)
+        {
+            return source.Compile(compilationUnit);
         }
     }
 }

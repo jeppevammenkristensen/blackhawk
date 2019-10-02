@@ -1,8 +1,6 @@
-﻿using Blackhawk.Models.LanguageConverter;
-
-namespace Blackhawk
+﻿namespace Blackhawk
 {
-    public class CsvConvertionSettings : IConvertionSettings
+    public class CsvConvertionSettings
     {
         public string Delimiter { get; set; }
 

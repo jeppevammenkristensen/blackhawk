@@ -2,11 +2,6 @@
 
 namespace Blackhawk.Models.LanguageConverter
 {
-    public interface IConvertionSettings
-    {
-
-    }
-
     /// <summary>
     /// The result of the conversion
     /// </summary>
@@ -30,7 +25,6 @@ namespace Blackhawk.Models.LanguageConverter
 
         public bool InputIsEnumerable { get; private set; }
 
-        //public string InputParameterType { get; set; }
     }
 
     public interface ILanguageConverter
