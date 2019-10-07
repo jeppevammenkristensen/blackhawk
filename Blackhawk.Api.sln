@@ -5,9 +5,7 @@ VisualStudioVersion = 16.0.29215.179
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Blackhawk", "Blackhawk.Api\Blackhawk.csproj", "{52751085-EE8C-4F5B-AFEB-3F9A9DCC44E2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blackhawk.Tests", "ClassLibrary1Blackhawk.Api.Tests\Blackhawk.Tests.csproj", "{BA8EDD5F-65AE-4289-A75C-D88C43E3939C}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "Tests\Tests.csproj", "{49ADE881-8806-41A2-ADF2-FB907E255F65}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests", "Tests\Tests.csproj", "{49ADE881-8806-41A2-ADF2-FB907E255F65}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,10 +17,6 @@ Global
 		{52751085-EE8C-4F5B-AFEB-3F9A9DCC44E2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{52751085-EE8C-4F5B-AFEB-3F9A9DCC44E2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{52751085-EE8C-4F5B-AFEB-3F9A9DCC44E2}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BA8EDD5F-65AE-4289-A75C-D88C43E3939C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BA8EDD5F-65AE-4289-A75C-D88C43E3939C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BA8EDD5F-65AE-4289-A75C-D88C43E3939C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BA8EDD5F-65AE-4289-A75C-D88C43E3939C}.Release|Any CPU.Build.0 = Release|Any CPU
 		{49ADE881-8806-41A2-ADF2-FB907E255F65}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{49ADE881-8806-41A2-ADF2-FB907E255F65}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{49ADE881-8806-41A2-ADF2-FB907E255F65}.Release|Any CPU.ActiveCfg = Release|Any CPU

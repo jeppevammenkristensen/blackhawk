@@ -7,11 +7,12 @@ namespace Blackhawk.Models.LanguageConverter
     /// </summary>
     public class Conversion
     {
-        public Conversion(string primaryClass, string classes, bool inputIsEnumerable)
+        public Conversion(string primaryClass, string classes, bool inputIsEnumerable, string sourceConverter)
         {
             PrimaryClass = primaryClass;
             Classes = classes;
             InputIsEnumerable = inputIsEnumerable;
+            SourceConverter = sourceConverter;
         }
 
         /// <summary>
@@ -24,6 +25,8 @@ namespace Blackhawk.Models.LanguageConverter
         public string Classes { get; private set; }
 
         public bool InputIsEnumerable { get; private set; }
+
+        public string SourceConverter { get; private set; }
 
     }
 

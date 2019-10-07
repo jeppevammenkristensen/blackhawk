@@ -57,7 +57,7 @@ namespace Blackhawk
             var  type = BuildCsvType(header, items.Skip(itemsToSkip).ToList());
 
             var cls = BuildClass(type, _settings);
-            return new Conversion(cls, "ReturnObject", true);
+            return new Conversion(cls, "ReturnObject", true, string.Empty);
         }
 
 

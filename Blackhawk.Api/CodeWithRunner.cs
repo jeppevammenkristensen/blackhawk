@@ -42,6 +42,10 @@ namespace Blackhawk
 
     public class Source
     {
+        internal const string ParserClassName = "ParsingUtility";
+        internal const string AsyncRunMethodName = "RunAsync";
+        internal const string RunnerClassName = "Runner";
+
         public ReadOnlyCollection<ClassFile> ClassSources { get; internal set; }
         public ClassDeclarationSyntax PrimarySource { get; internal set; }
 
@@ -63,6 +67,9 @@ namespace Blackhawk
         }
 
         public string InputParameterName { get; private set; } = "input";
+        public Method ParseMethod { get; set; }
+        public string OriginalSource { get; set; }
+        public bool InputIsEnumerable { get; set; }
 
         public Source WithInputParameterName(string inputParameterName)
         {
@@ -70,25 +77,40 @@ namespace Blackhawk
             return this;
         }
 
-
         public CompilationUnitSyntax BuildBaseCompilation()
         {
             var customWorkSpace = new AdhocWorkspace();
 
-            var compilationUnitSyntax = CompilationUnit().AddUsings().NormalizeWhitespace();
-
             var usingStatements = References.SelectMany(x => x._usings)
                 .Select(x => UsingDirective(ParseName(x))).ToArray();
 
-            compilationUnitSyntax = CompilationUnit()
+            var compilationUnitSyntax = CompilationUnit()
                 .AddUsings(usingStatements)
+                .AddMembers(UtilityClass())
                 .AddMembers(ClassSources
                     .Select(x => x.ClassDeclarationSyntax)
+                    .OfType<MemberDeclarationSyntax>()
                     .ToArray()).NormalizeWhitespace();
 
 
             return (CompilationUnitSyntax)Formatter.Format(compilationUnitSyntax, customWorkSpace);
 
+        }
+
+        public MemberDeclarationSyntax[] UtilityClass()
+        {
+            var publicStaticMethod = this.ParseMethod.DeclarationSyntax
+                .WithModifiers(new SyntaxTokenList(Token(SyntaxKind.PublicKeyword),
+                    Token(SyntaxKind.StaticKeyword)));
+
+            var classDeclarationSyntax = ClassDeclaration(ParserClassName)
+                .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                .AddMembers(publicStaticMethod);
+
+            return new MemberDeclarationSyntax[]
+            {
+                classDeclarationSyntax
+            };
         }
 
 
@@ -97,32 +119,37 @@ namespace Blackhawk
             var blockSyntax = (BlockSyntax)ParseStatement($"{{ {source} }}");
 
             var customWorkSpace = new AdhocWorkspace();
-            //var compilationUnitSyntax = CompilationUnit().AddUsings().NormalizeWhitespace();
 
             var usingStatements = References.SelectMany(x => x._usings)
                 .Select(x => UsingDirective(ParseName(x))).ToArray();
+
+            var inputType = InputIsEnumerable
+                ? ParseTypeName($"List<{PrimarySource.Identifier}>")
+                : IdentifierName(PrimarySource.Identifier);
 
             var runnerMethod =
                 MethodDeclaration(
                         // returnType: Task<Object> // MethodName RunAsync  
                         returnType: GenericName(Identifier("Task"))
-                            .AddTypeArgumentListArguments(PredefinedType(Token(SyntaxKind.ObjectKeyword))), "RunAsync"
+                            .AddTypeArgumentListArguments(PredefinedType(Token(SyntaxKind.ObjectKeyword))), AsyncRunMethodName
                     )
                     // public static async
                     .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword),
                         Token(SyntaxKind.AsyncKeyword))
                     // Input parameter for instance ReturnObject input
                     .AddParameterListParameters(Parameter(Identifier(InputParameterName))
-                        .WithType(IdentifierName(PrimarySource.Identifier)))
+                        .WithType(inputType))
                     .AddBodyStatements(blockSyntax);
 
-            var classDeclaration = ClassDeclaration("Runner")
+            var classDeclaration = ClassDeclaration(RunnerClassName)
                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
                 .AddMembers(runnerMethod);
 
             var compilationUnitSyntax = CompilationUnit()
                 .AddUsings(usingStatements)
+                .AddMembers(UtilityClass())
                 .AddMembers(classDeclaration)
+                .AddMembers()
                 .AddMembers(ClassSources
                     .Select(x => x.ClassDeclarationSyntax)
                     .Cast<MemberDeclarationSyntax>()
@@ -151,7 +178,8 @@ namespace Blackhawk
         //public Task<object> ExecuteAsync(string returnInput)
         //{
         //    var buildCompilation = BuildCompilation(returnInput);
-        //}
+        //} 
+
     }
 
 
@@ -163,6 +191,23 @@ namespace Blackhawk
         {
             Classes.Add(node);
             base.VisitClassDeclaration(node);
+        }
+    }
+
+    public class Method
+    {
+        internal Method(MethodDeclarationSyntax declarationSyntax)
+        {
+            DeclarationSyntax = declarationSyntax;
+        }
+
+        public MethodDeclarationSyntax DeclarationSyntax { get; private set; }
+
+        public string MethodName => DeclarationSyntax.Identifier.ToString();
+
+        public string ToString()
+        {
+            return DeclarationSyntax.ToString();
         }
     }
 
@@ -235,9 +280,20 @@ namespace Blackhawk
             var compiledCode = Source.Compile(compilationUnitSyntax);
             if (compiledCode.Success)
             {
-                var mainType = compiledCode.Assembly.GetType("Runner");
+                var parserType = compiledCode.Assembly.GetType(Source.ParserClassName);
+                if (parserType == null)
+                    throw new InvalidOperationException(
+                        $"Failed to locate parser type {Source.ParserClassName}{Environment.NewLine}{compilationUnitSyntax}");
+
+                var parseMethod = parserType.GetMethod(Source.ParseMethod.MethodName);
+                if (parseMethod == null) throw new InvalidOperationException("Failed to locate method for parsing");
+
+                var mainType = compiledCode.Assembly.GetType(Source.RunnerClassName);
                 var methodInfo = mainType.GetMethod("RunAsync");
-                var task = (Task<object>)methodInfo.Invoke(null, new object[] { null });
+                if (methodInfo == null) throw new InvalidOperationException("Failed to locate method with name RunAsync");
+
+                var task = (Task<object>)methodInfo.Invoke(null, new object[] { parseMethod.Invoke(null, new Object[] { Source.OriginalSource }) });
+
                 var res = await task;
                 return (res, compiledCode);
             }

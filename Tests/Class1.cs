@@ -20,40 +20,41 @@ namespace Blackhawk
         }
 
         [Fact]
-        public async Task Can_Build_Json_From_Fluent_Interface()
+        public async Task BuildSingleJsonReplReturnsExpected()
         {
-            var builder = Build.Init().WithConverter(new JsonLanguageConverter(new JsonConvertionSettings()));
-            var source = builder.GenerateSource("[{ \"name\" : { \"firstName\" : \"Jeppe Kristensen\"}}]");
-            source.PrimarySource.Identifier.ToString().Should().Be("ReturnObject");
-
-            var nameClass = source.ClassSources.FirstOrDefault(x => x.Name == "Name");
-
-            var (obj, code) = await source.Repl().Execute("return input;");
+            (object obj, _) = await Build
+                .Init()
+                .WithConverter(new JsonLanguageConverter(new JsonConvertionSettings()))
+                .GenerateSource("{ \"name\" : { \"firstName\" : \"Jeppe Kristensen\"}}")
+                .Repl()
+                .Execute("return input.Name.FirstName;");
+            
             obj.Should().NotBeNull();
-            obj.Should().Be(5);
-            // //var result = source.ExecuteAsync("return input;");
-            // var result = source.BuildBaseCompilation();
-            // var item = source.Compile(result);
-            //tem.Success.Should().BeTrue();
-
-
-            //item.Diagnostics.Should().HaveCount(1);
-
-
-            //var mainType = item.Assembly.GetType("Runner");
-            //var methodInfo = mainType.GetMethod("RunAsync");
-            //var task = (Task<object>)methodInfo.Invoke(null, new object[] {null});
-            //var res = await task;
-
-            //res.Should().Be(5);
-            //mainType.Should().NotBeNull();
-            //_testOutputHelper.WriteLine(result.ToString());
-
-            //int i = 0;
-
-
+            dynamic dynamicObj = obj;
+            
+            obj.Should().Be("Jeppe Kristensen");
         }
 
+        [Fact]
+        public async Task BuildEnumerableJsonReplReturnsExpected()
+        {
+            (object obj, _) = await Build
+                .Init()
+                .WithConverter(new JsonLanguageConverter(new JsonConvertionSettings()))
+                .GenerateSource("[{ \"name\" : { \"firstName\" : \"Jeppe Kristensen\"}}]")
+                .Repl()
+                .Execute("return input;");
+
+            obj.Should().NotBeNull();
+            dynamic dynamicObj = obj;
+
+            var count = (int) dynamicObj.Count;
+            count.Should().Be(1);
+
+            var firstName = (string) dynamicObj[0].Name.FirstName;
+            firstName.Should().Be("Jeppe Kristensen");
+
+        }
     }
 }
     
