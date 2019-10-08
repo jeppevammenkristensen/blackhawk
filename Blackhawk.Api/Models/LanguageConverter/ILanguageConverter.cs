@@ -1,35 +1,5 @@
-﻿using System;
-
-namespace Blackhawk.Models.LanguageConverter
+﻿namespace Blackhawk.Models.LanguageConverter
 {
-    /// <summary>
-    /// The result of the conversion
-    /// </summary>
-    public class Conversion
-    {
-        public Conversion(string primaryClass, string classes, bool inputIsEnumerable, string sourceConverter)
-        {
-            PrimaryClass = primaryClass;
-            Classes = classes;
-            InputIsEnumerable = inputIsEnumerable;
-            SourceConverter = sourceConverter;
-        }
-
-        /// <summary>
-        /// The name of the primary class (root)
-        /// </summary>
-        public string PrimaryClass { get; private set; }
-        /// <summary>
-        /// The classes generated. 
-        /// </summary>
-        public string Classes { get; private set; }
-
-        public bool InputIsEnumerable { get; private set; }
-
-        public string SourceConverter { get; private set; }
-
-    }
-
     public interface ILanguageConverter
     {
         /// <summary>

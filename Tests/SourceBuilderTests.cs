@@ -1,14 +1,11 @@
-﻿using System;
-using System.Linq;
-using System.Reflection;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
+using Blackhawk;
 using Blackhawk.Extensions;
 using FluentAssertions;
-using Namotion.Reflection;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Blackhawk
+namespace Tests
 {
     public class SourceBuilderTests
     {
@@ -22,17 +19,14 @@ namespace Blackhawk
         [Fact]
         public async Task BuildSingleJsonReplReturnsExpected()
         {
-            (object obj, _) = await Build
+            var  output = await Build
                 .Init()
                 .WithConverter(new JsonLanguageConverter(new JsonConvertionSettings()))
                 .GenerateSource("{ \"name\" : { \"firstName\" : \"Jeppe Kristensen\"}}")
                 .Repl()
-                .Execute("return input.Name.FirstName;");
+                .Execute("return input;").ToJson();
             
-            obj.Should().NotBeNull();
-            dynamic dynamicObj = obj;
-            
-            obj.Should().Be("Jeppe Kristensen");
+            _testOutputHelper.WriteLine(output);
         }
 
         [Fact]
@@ -54,6 +48,20 @@ namespace Blackhawk
             var firstName = (string) dynamicObj[0].Name.FirstName;
             firstName.Should().Be("Jeppe Kristensen");
 
+        }
+
+        [Fact]
+        public async Task BuildCsvResultReturnsExpected()
+        {
+            (object result, CompiledCode code) valueTuple = await Build.Init()
+                .WithConverter(new CsvLanguageConverter(new CsvConvertionSettings()
+                {
+                    Delimiter = ",",
+                    FirstLineContainsHeaders = true
+                }))
+                .GenerateSource(@"Firstname,age
+""Jeppe"",41").Repl().Execute("return input.Select(x => new { x.Firstname }).First();");
+            _testOutputHelper.WriteLine(valueTuple.ToJson());
         }
     }
 }

@@ -1,5 +1,4 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 using System.Linq;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
@@ -10,9 +9,9 @@ namespace Blackhawk
 {
     public class CompiledCode   
     {
-        public Assembly Assembly { get; }
+        public Assembly? Assembly { get; }
 
-        private CompiledCode(EmitResult result, Assembly assembly)
+        private CompiledCode(EmitResult result, Assembly? assembly)
         {
             Success = result.Success;
             Diagnostics = result.Diagnostics.ToArray();    
@@ -20,7 +19,7 @@ namespace Blackhawk
 
         }
 
-        public Diagnostic[] Diagnostics { get; set; }
+        public Diagnostic[] Diagnostics { get; private set; } 
 
         public bool Success { get;  }
 
@@ -29,28 +28,14 @@ namespace Blackhawk
             using (var stream = new MemoryStream())
             {
                 var result = compilation.Emit(stream);
-                Assembly assembly = null;
+                Assembly? assembly = null;
                 if (result.Success)
                 {
-                    assembly = System.Reflection.Assembly.Load(stream.ToArray());
+                    assembly = Assembly.Load(stream.ToArray());
                 }
 
                 return new CompiledCode(result,assembly);
             }
-        }
-
-        public Type GetMainType(string mainType)
-        {
-            return Assembly.GetType(mainType);
-        }
-
-        public object Execute(object input)
-        {
-            var type = Assembly.GetType("Runner");
-            
-            var obj = Activator.CreateInstance(type);
-            var rst = type.InvokeMember("Run", BindingFlags.InvokeMethod, null, obj, new object[] { input }, null);
-            return rst;
         }
     }
 }

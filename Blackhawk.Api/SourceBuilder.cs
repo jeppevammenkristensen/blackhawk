@@ -10,7 +10,7 @@ namespace Blackhawk
     public class SourceBuilder
     {
         internal SourceStatus Status { get; private set; } = SourceStatus.Incomplete;
-        private ILanguageConverter? _converter = null;
+        private ILanguageConverter? _converter;
 
         public SourceBuilder WithConverter(ILanguageConverter languageConverter)
         {
@@ -42,34 +42,29 @@ namespace Blackhawk
                             $"Failed to find a primary class with the name {result.PrimaryClass} in the list of generated classed");
                     }
 
-                    if (!(SyntaxFactory.ParseMemberDeclaration(result.SourceConverter) is MethodDeclarationSyntax method
-                        ))
+                    var memberDeclarationSyntaxes = SyntaxFactory.ParseCompilationUnit(result.SourceConverter).Members;
+                    if (!memberDeclarationSyntaxes.All(x => x is MethodDeclarationSyntax))
                     {
-                        throw new InvalidOperationException(
-                            $"Source converter {this._converter.GetType().Name} generated invalid code for generating the method");
+                        throw new InvalidOperationException($"The SourceConverter result consist only of one or more methods:{Environment.NewLine}{result.SourceConverter}");
                     }
-
-                    return new Source()
+                    
+                    return new Source
                     {
                         ClassSources =
                             new ReadOnlyCollection<ClassFile>(classes.Select(x => new ClassFile(x)).ToList()),
                         PrimarySource = primary,
-                        ParseMethod = new Method(method),
+                        ParseMethod = new Method(memberDeclarationSyntaxes.Cast<MethodDeclarationSyntax>().ToArray()),
                         OriginalSource = source,
                         InputIsEnumerable = result.InputIsEnumerable
-                    };
+                    }.AddReferences(result.References.ToArray());
                 }
-                else
-                {
-                    return Source.Invalid(details);
-                }
+
+                return Source.Invalid(details);
             }
-            else
-            {
-                throw new InvalidOperationException(
-                    $"Trying to generate Source but no Converter has been defined. Call {nameof(WithConverter)} with a relevant converter");
-            }
-       
+
+            throw new InvalidOperationException(
+                $"Trying to generate Source but no Converter has been defined. Call {nameof(WithConverter)} with a relevant converter");
+
         }
     }
 }

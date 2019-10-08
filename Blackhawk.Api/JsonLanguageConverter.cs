@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text.Json;
-using System.Threading;
 using Blackhawk.Models.LanguageConverter;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -11,28 +8,12 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
-//using Newtonsoft.Json;
-//using Newtonsoft.Json.Linq;
-//using Newtonsoft.Json.Serialization;
 using NJsonSchema;
 using NJsonSchema.CodeGeneration.CSharp;
-
-
 using Conversion = Blackhawk.Models.LanguageConverter.Conversion;
 
 namespace Blackhawk
 {
-    public class JsonConvertionSettings
-    {
-        public bool UsePascalCase { get; set; } = true;
-
-        public JsonConvertionSettings WithPascalCase(bool usePascalCase)
-        {
-            UsePascalCase = usePascalCase;
-            return this;
-        }
-    }
-
     public class JsonLanguageConverter : ILanguageConverter
     {
         private readonly JsonConvertionSettings _settings;
@@ -47,7 +28,7 @@ namespace Blackhawk
             try
             {
                 JToken.Parse(source);
-                return (true, null);
+                return (true, default!);
             }
             catch (JsonReaderException e)
             {
@@ -57,21 +38,34 @@ namespace Blackhawk
 
         public Conversion GenerateCsharp(string input)
         {
-            var csharpSettings = new CSharpGeneratorSettings();
-            csharpSettings.ClassStyle = CSharpClassStyle.Poco;
-            csharpSettings.TypeNameGenerator = new CustomDefaultTypeName(PrimaryClass);
-            csharpSettings.GenerateJsonMethods = true;
-         
+            var csharpSettings = new CSharpGeneratorSettings
+            {
+                ClassStyle = CSharpClassStyle.Poco,
+                TypeNameGenerator = new CustomDefaultTypeName(PrimaryClass),
+                GenerateJsonMethods = true,
+                
+            };
+
             var schema = JsonSchema.FromSampleJson(input);
 
             var cSharpGenerator = new CSharpGenerator(schema,csharpSettings);
             var result = cSharpGenerator.GenerateFile();
 
-            var classDeclarationSyntaxs = SyntaxFactory.ParseCompilationUnit(result).DescendantNodes().OfType<ClassDeclarationSyntax>().Cast<MemberDeclarationSyntax>().ToArray();
+            // Get all classes
+            var classDeclarationSyntaxes = SyntaxFactory
+                .ParseCompilationUnit(result)
+                .DescendantNodes()
+                .OfType<ClassDeclarationSyntax>()
+                .Cast<MemberDeclarationSyntax>()
+                .ToArray();
 
-            string resultString = SyntaxFactory.CompilationUnit().AddMembers(classDeclarationSyntaxs).NormalizeWhitespace().ToString();
+            var resultString = SyntaxFactory
+                .CompilationUnit()
+                .AddMembers(classDeclarationSyntaxes)
+                .NormalizeWhitespace()
+                .ToString();
 
-            var (isArray, method) = DetermineEnumerabilityAndSourceMethod(input, classDeclarationSyntaxs);
+            var (isArray, method) = DetermineEnumerabilityAndSourceMethod(input, classDeclarationSyntaxes);
 
             return new Conversion(PrimaryClass,resultString, isArray,  method);
         }
@@ -120,100 +114,10 @@ namespace Blackhawk
 
             return JsonConvert.DeserializeObject(
                 requestSource, enumerableType,
-                new JsonSerializerSettings()
+                new JsonSerializerSettings
                 {
                     ContractResolver = new CamelCasePropertyNamesContractResolver()
                 });
         }
     }
-
-    public class CustomDefaultTypeName : DefaultTypeNameGenerator
-    {
-        private readonly string _defaultName;
-
-        public CustomDefaultTypeName(string defaultName)
-        {
-            _defaultName = defaultName;
-        }
-
-        public override string Generate(JsonSchema schema, string typeNameHint, IEnumerable<string> reservedTypeNames)
-        {
-            if (string.IsNullOrWhiteSpace(typeNameHint))
-            {
-                return _defaultName;
-            }
-            return base.Generate(schema, typeNameHint, reservedTypeNames);
-        }
-    }
-
-    public class MethodMakeEnumerable : CSharpSyntaxRewriter
-    {
-        public MethodMakeEnumerable(string inputType)
-        {
-            InputType = inputType;
-        }
-
-        public string InputType { get; }
-
-        public override SyntaxNode VisitMethodDeclaration(MethodDeclarationSyntax node)
-        {
-            node = node.WithReturnType(SyntaxFactory.ParseTypeName($"List<{InputType}>"));
-
-
-
-            return base.VisitMethodDeclaration(node);
-        }
-
-        public override SyntaxNode VisitGenericName(GenericNameSyntax node)
-        {
-            if (node.Identifier.ToString() != "List")
-            {
-                return base.VisitGenericName(node);
-            }
-
-            return node;
-        }
-
-        public override SyntaxNode VisitTypeArgumentList(TypeArgumentListSyntax node)
-        {
-            var first = node.Arguments.First();
-            node = node.ReplaceNode(first, SyntaxFactory.ParseTypeName($"List<{InputType}>"));
-            return base.VisitTypeArgumentList(node);
-        }
-    }
-
-    public class JsonFindMethod : CSharpSyntaxWalker
-    {
-        public MethodDeclarationSyntax? Method { get; private set; }
-
-        public JsonFindMethod(string className, string methodName)
-        {
-            ClassName = className;
-            MethodName = methodName;
-        }
-
-        public string ClassName { get; }
-        public string MethodName { get; }
-
-        public override void VisitClassDeclaration(ClassDeclarationSyntax node)
-        {
-            if (node.Identifier.ToString() != ClassName)
-                base.VisitClassDeclaration(node);
-            else
-            {
-                var methodDeclarationSyntax = node.DescendantNodes()
-                    .OfType<MethodDeclarationSyntax>()
-                    .FirstOrDefault(x => x.Identifier.ToString() == MethodName);
-                if (methodDeclarationSyntax != null)
-                    Method = methodDeclarationSyntax;
-                else
-                {
-                    base.VisitClassDeclaration(node);
-                }
-            }
-
-        }
-    }
-
-
 }

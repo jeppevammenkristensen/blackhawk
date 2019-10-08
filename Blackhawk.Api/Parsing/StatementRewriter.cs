@@ -9,6 +9,11 @@ namespace Blackhawk.Parsing
     /// </summary>
     public class StatementRewriter : CSharpSyntaxRewriter
     {
+        public StatementRewriter(string statement)
+        {
+            Statement = statement;
+        }
+
         public override SyntaxNode VisitMethodDeclaration(MethodDeclarationSyntax node)
         {
             if (node.Identifier.ToString() != "Run")
@@ -22,6 +27,6 @@ namespace Blackhawk.Parsing
 
         }
 
-        public string Statement { get; set; }
+        public string Statement { get; }
     }
 }
