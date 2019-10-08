@@ -4,14 +4,16 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>8.0</LangVersion>
     <Nullable>enable</Nullable>
-    <PackageVersion>0.8.1</PackageVersion>
+    <PackageVersion>0.8.2</PackageVersion>
     <Title>Blackhawk Api</Title>
     <Authors>Jeppe Roi Kristensen</Authors>
     <Description> A library for quick converting formats like json, csv to code you can call with c#</Description>
     <Copyright>Jeppe Roi Kristensen</Copyright>
     <PackageTags>c# roslyn</PackageTags>
-    <PackageReleaseNotes>Stabilized Csv-converter</PackageReleaseNotes>
+    <PackageReleaseNotes>Updated nuget information and documentation</PackageReleaseNotes>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/jeppevammenkristensen/blackhawk</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/jeppevammenkristensen/blackhawk</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>
