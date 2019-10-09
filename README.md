@@ -1,3 +1,6 @@
+[![NuGet version ](https://img.shields.io/nuget/v/Blackhawk.svg?style=flat-square)](https://www.nuget.org/packages/Blackhawk/)
+
+
 # Blackhawk
 An api for generating code from Json, Csv and other formats that you can do repl like C# against
 
