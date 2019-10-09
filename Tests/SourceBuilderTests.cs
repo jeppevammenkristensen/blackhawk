@@ -22,7 +22,7 @@ namespace Tests
             var  output = await Build
                 .Init()
                 .WithConverter(new JsonLanguageConverter(new JsonConvertionSettings()))
-                .GenerateSource("{ \"name\" : { \"firstName\" : \"Jeppe Kristensen\"}}")
+                .GenerateSourceFromString("{ \"name\" : { \"firstName\" : \"Jeppe Kristensen\"}}")
                 .Repl()
                 .Execute("return input;").ToJson();
             
@@ -35,7 +35,7 @@ namespace Tests
             (object obj, _) = await Build
                 .Init()
                 .WithConverter(new JsonLanguageConverter(new JsonConvertionSettings()))
-                .GenerateSource("[{ \"name\" : { \"firstName\" : \"Jeppe Kristensen\"}}]")
+                .GenerateSourceFromString("[{ \"name\" : { \"firstName\" : \"Jeppe Kristensen\"}}]")
                 .Repl()
                 .Execute("return input;");
 
@@ -59,9 +59,22 @@ namespace Tests
                     Delimiter = ",",
                     FirstLineContainsHeaders = true
                 }))
-                .GenerateSource(@"Firstname,age
+                .GenerateSourceFromString(@"Firstname,age
 ""Jeppe"",41").Repl().Execute("return input.Select(x => new { x.Firstname }).First();");
             _testOutputHelper.WriteLine(valueTuple.ToJson());
+        }
+
+        [Fact]
+        public async Task CanInitSourceFromFile()
+        {
+            var source = await Build
+                .Init()
+                .WithConverter(new JsonLanguageConverter(new JsonConvertionSettings()))
+                .GenerateSourceFromFile("TestArtifacts/TestFile.json");
+            source.ClassSources.Should().Contain(x => x.Name == "ReturnObject");
+            source.ClassSources.Should().Contain(x => x.Name == "Parents");
+
+
         }
     }
 }

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Blackhawk.Models.LanguageConverter;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -19,7 +21,22 @@ namespace Blackhawk
             return this;
         }
 
-        public Source GenerateSource(string source)
+        public async Task<Source> GenerateSourceFromFile(string filePath)
+        {
+            string sourceText;
+            try
+            {
+                sourceText = await File.ReadAllTextAsync(filePath);
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidOperationException($"An exception occurred trying to open file {filePath}",exception);
+            }
+
+            return GenerateSourceFromString(sourceText);
+        }
+
+        public Source GenerateSourceFromString(string source)
         {
             if (_converter != null)
             {

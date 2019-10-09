@@ -18,4 +18,10 @@
     <ProjectReference Include="..\Blackhawk.Api\Blackhawk.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="TestArtifacts\TestFile.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

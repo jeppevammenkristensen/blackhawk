@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Rolf Asmussen",
+    "age": 42,
+    "parents": [
+      {
+        "name": "Ingolf Asmussen",
+        "parents": [
+          {
+            "name": "Asta Asmussen",
+            "parents": []
+          }
+        ]
+      },
+      {
+        "name": "Ilse Asmussen'",
+        "parents" : [{
+          "name":"Leonora Larsen",
+          "parents" : [{
+            "name" : "Ulrik Larsen",
+            "parents": []
+          }]
+        }]
+      }
+    ]
+  }
+]

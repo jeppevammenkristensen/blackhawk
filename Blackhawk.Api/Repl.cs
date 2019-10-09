@@ -26,7 +26,12 @@ namespace Blackhawk
                 var parseMethod = parserType.GetMethod(Source.ParseMethod.MethodName);
                 if (parseMethod == null) throw new InvalidOperationException("Failed to locate method for parsing");
 
-                var mainType = compiledCode.Assembly.GetType(Source.RunnerClassName);
+                var mainType = compiledCode.Assembly?.GetType(Source.RunnerClassName);
+                if (mainType == null)
+                {
+                    throw new InvalidOperationException("Failed to load main type");
+                }
+                
                 var methodInfo = mainType.GetMethod("RunAsync");
                 if (methodInfo == null) throw new InvalidOperationException("Failed to locate method with name RunAsync");
 
